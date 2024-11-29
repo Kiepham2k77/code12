@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Điều khiển băng chuyền</title>
+    <link rel="stylesheet" href="control1.css"> <!-- Nhúng tệp CSS -->
+    <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+    import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyBWXObaYok2OlQa5BcRBhhDpsbc7CFEYrQ",
+        authDomain: "khkt-fb906.firebaseapp.com",
+        databaseURL: "https://khkt-fb906-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "khkt-fb906",
+        storageBucket: "khkt-fb906.firebasestorage.app",
+        messagingSenderId: "843931539573",
+        appId: "1:843931539573:web:0c391975bd7d4ab4dc003c",
+        measurementId: "G-MV6M3DHVW2"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    let isSending = false; // Trạng thái khóa
+    let lastCommand = null; // Lệnh cuối cùng đã gửi
+
+    function controlBelt(command) {
+        if (isSending) {
+            console.warn("Lệnh đang được gửi. Vui lòng đợi...");
+            return;
+        }
+
+        if (command === lastCommand) {
+            console.log("Lệnh đã gửi trước đó. Bỏ qua...");
+            return;
+        }
+
+        isSending = true; // Khóa trạng thái
+        const commandRef = ref(db, 'conveyorBelt/commands');
+
+        set(commandRef, { command })
+            .then(() => {
+                console.log('Command sent:', command);
+                lastCommand = command; // Cập nhật lệnh cuối cùng
+                updateStatus(command);
+            })
+            .catch((error) => {
+                console.error('Error sending command:', error);
+                alert('Không thể gửi lệnh. Vui lòng kiểm tra kết nối!');
+            })
+            .finally(() => {
+                isSending = false; // Mở khóa sau khi hoàn thành
+            });
+    }
+
+    function updateStatus(command) {
+        const statusElement1 = document.getElementById('beltStatus1');
+        const statusElement2 = document.getElementById('beltStatus2');
+
+        if (command === 'start1') {
+            statusElement1.textContent = 'Đang hoạt động';
+        } else if (command === 'stop1') {
+            statusElement1.textContent = 'Đã dừng lại';
+        } else if (command === 'start2') {
+            statusElement2.textContent = 'Đang hoạt động';
+        } else if (command === 'stop2') {
+            statusElement2.textContent = 'Đã dừng lại';
+        } else {
+            console.warn('Unknown command:', command);
+        }
+    }
+
+    function listenToCommands() {
+        const commandRef = ref(db, 'conveyorBelt/commands');
+
+        onValue(commandRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data && data.command) {
+                console.log('Received command:', data.command);
+
+                if (data.command !== lastCommand) {
+                    updateStatus(data.command);
+                }
+            } else {
+                console.warn('No command found in snapshot.');
+            }
+        });
+    }
+
+    listenToCommands();
+    window.controlBelt = controlBelt;
+    </script>
+</head>
+<body>
+    <header>
+        <nav>
+            <ul>
+                <li><a href="main.html">Trang chính</a></li>
+                <li><a href="control2.html">Điều Khiển Chung</a></li>
+                <li><a href="statistics.html">Thống kê sản phẩm</a></li>
+                <li><a href="index.html" onclick="logout()">Đăng xuất</a></li>
+            </ul>
+        </nav>
+    </header>
+    <div class="control-container">
+        <div class="belt-control">
+            <h1>Băng chuyền 1</h1>
+            <div class="button-group">
+                <button onclick="controlBelt('start1')">Bắt đầu</button>
+                <button onclick="controlBelt('stop1')">Dừng lại</button>
+            </div>
+            <div id="status1">
+                <h2>Trạng thái băng chuyền 1:</h2>
+                <p id="beltStatus1">Chưa được điều khiển</p>
+            </div>
+        </div>
+        <div class="belt-control">
+            <h1>Băng chuyền 2</h1>
+            <div class="button-group">
+                <button onclick="controlBelt('start2')">Bắt đầu</button>
+                <button onclick="controlBelt('stop2')">Dừng lại</button>
+            </div>
+            <div id="status2">
+                <h2>Trạng thái băng chuyền 2:</h2>
+                <p id="beltStatus2">Chưa được điều khiển</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

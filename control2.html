@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Điều khiển hệ thống</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="control2.css"> <!-- Nhúng tệp CSS -->
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <nav>
+            <ul>
+                <li><a href="main.html">Trang chính</a></li>
+                <li><a href="control1.html">Điều Khiển Băng Chuyền</a></li>
+                <li><a href="statistics.html">Thống kê sản phẩm</a></li>
+                <li><a href="index.html" onclick="logout()">Đăng xuất</a></li>
+            </ul>
+        </nav>
+    </header>
+    <div class="container">
+        <div class="control-container">
+            <!-- Băng chuyền 1 -->
+            <div class="belt-group">
+                <h2>Băng chuyền 1</h2>
+                <div class="button-group">
+                    <button onclick="controlSystem('red')">Đỏ</button>
+                    <button onclick="controlSystem('green')">Xanh lá</button>
+                    <button onclick="controlSystem('blue')">Xanh dương</button>
+                </div>
+                <div class="button-group">
+                    <button onclick="controlSystem('error')">Lỗi</button>
+                </div>
+                <div class="status-bar" id="status1">
+                    Trạng thái: Chưa điều khiển
+                </div>
+            </div>
+            <!-- Băng chuyền 2 -->
+            <div class="belt-group">
+                <h2>Băng chuyền 2</h2>
+                <div class="button-group">
+                    <button onclick="controlSystem('cot')">Cột</button>
+                    <button onclick="controlSystem('tang')">Tăng</button>
+                    <button onclick="controlSystem('giam')">Giảm</button>
+                </div>
+                <div class="button-group">
+                    <button onclick="toggleStartStop()">Bắt đầu/Dừng lại</button>
+                </div>
+                <div class="status-bar" id="status2">
+                    Trạng thái: Chưa điều khiển
+                </div>
+                           <div class="flex justify-center space-x-2">
+                <div class="bg-white border square-box">0</div>
+                <div class="bg-white border square-box">0</div>
+                <div class="bg-white border square-box">0</div>
+                <div class="bg-white border square-box">0</div> <!-- Cột số thứ tư -->
+            </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+        import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBWXObaYok2OlQa5BcRBhhDpsbc7CFEYrQ",
+            authDomain: "khkt-fb906.firebaseapp.com",
+            databaseURL: "https://khkt-fb906-default-rtdb.asia-southeast1.firebasedatabase.app/",
+            projectId: "khkt-fb906",
+            storageBucket: "khkt-fb906.appspot.com",
+            messagingSenderId: "1234567890",
+            appId: "1:1234567890:web:abcdef123456"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+
+        let columnCounter = 0; // Bộ đếm cột
+        let belt2Status = 'stopped'; // Biến theo dõi trạng thái băng chuyền 2 (bắt đầu/dừng)
+
+        // Hàm điều khiển hệ thống
+        window.controlSystem = function(command) {
+            let path;
+            // Kiểm tra để gửi lệnh đúng cho băng chuyền 1 và 2
+            if (command === 'red' || command === 'green' || command === 'blue' || command === 'error') {
+                path = "belt1/command"; // Lệnh cho Băng chuyền 1
+            } else if (command === 'cot') {
+                path = "belt2/command"; // Lệnh cho Băng chuyền 2
+            } else {
+                path = "belt2/command"; // Lệnh mặc định cho Băng chuyền 2
+            }
+
+            const statusElement = document.getElementById(`status${command === 'cot' ? 2 : 1}`);
+
+            // Gửi trực tiếp lệnh lên Firebase
+            set(ref(database, path), command)
+                .then(() => {
+                    if (command === "cot") {
+                        columnCounter++;
+                        updateColumnDisplay(); // Cập nhật giao diện bộ đếm
+                    }
+                    statusElement.innerText = `Trạng thái: ${command}`; // Hiển thị trạng thái trên giao diện
+                })
+                .catch((error) => {
+                    console.error("Lỗi khi gửi lệnh:", error);
+                });
+        };
+
+        // Hàm cập nhật giá trị hiển thị các cột
+        function updateColumnDisplay() {
+            const columns = document.querySelectorAll(".belt-group:nth-child(2) .bg-white");
+            const paddedValue = columnCounter.toString().padStart(4, "0");
+            [...paddedValue].forEach((digit, index) => {
+                if (columns[index]) {
+                    columns[index].innerText = digit;
+                }
+            });
+        }
+
+        // Hàm kiểm tra và thay đổi trạng thái băng chuyền 2 (bắt đầu/dừng lại)
+        window.toggleStartStop = function() {
+            if (belt2Status === 'stopped') {
+                set(ref(database, "belt2/command"), "start");
+                belt2Status = 'started'; // Đổi trạng thái sang 'started'
+                document.getElementById('status2').innerText = 'Trạng thái: Bắt đầu';
+            } else {
+                set(ref(database, "belt2/command"), "stop");
+                belt2Status = 'stopped'; // Đổi trạng thái sang 'stopped'
+                document.getElementById('status2').innerText = 'Trạng thái: Dừng lại';
+            }
+        };
+
+        // Lắng nghe trạng thái từ Firebase
+        function listenForStatusUpdates() {
+            const statusRefs = {
+                belt1: ref(database, "belt1/status"),
+                belt2: ref(database, "belt2/status"),
+            };
+
+            onValue(statusRefs.belt1, (snapshot) => {
+                const status = snapshot.val();
+                document.getElementById("status1").innerText = `Trạng thái: ${status || "Chưa điều khiển"}`;
+            });
+
+            onValue(statusRefs.belt2, (snapshot) => {
+                const status = snapshot.val();
+                document.getElementById("status2").innerText = `Trạng thái: ${status || "Chưa điều khiển"}`;
+            });
+        }
+
+        listenForStatusUpdates(); // Khởi động việc lắng nghe các thay đổi trạng thái từ Firebase
+    </script>
+</body>
+</html>
